@@ -69,6 +69,7 @@ class PrinterApp extends EventEmitter {
             this.components.monitor.start();
 
             // Connect MQTT
+            console.log('Connecting to MQTT broker at servicez.cloud:1883');
             await this.components.mqtt.connect();
 
             console.log('✓ All components initialized successfully');
@@ -134,13 +135,19 @@ class PrinterApp extends EventEmitter {
         });
 
         // MQTT connection events
+        this.components.mqtt.on('connecting', () => {
+            console.log('🔄 Connecting to MQTT...');
+            this.components.led.pulse(255, 255, 0, 1000); // Pulsing yellow while connecting
+        });
+
         this.components.mqtt.on('connected', () => {
             console.log('✓ MQTT connected');
+            // LED will be updated by next status update
         });
 
         this.components.mqtt.on('disconnected', () => {
             console.log('✗ MQTT disconnected');
-            this.components.led.setColor(255, 255, 0, 300); // Yellow for offline
+            // Don't override LED here - let status update handle it
         });
 
         this.components.mqtt.on('error', (error) => {
@@ -179,17 +186,22 @@ class PrinterApp extends EventEmitter {
     updateStatusLed(status) {
         if (this.isShuttingDown) return;
 
-        // Priority order: error > paper out > processing > wifi signal
-        if (status.printer === 'error' || !status.usbConnected) {
-            this.components.led.setColor(255, 0, 0, 300); // Red for error
-        } else if (status.printer === 'paper out') {
-            this.components.led.setColor(255, 0, 0, 300); // Red for paper out
+        // Priority order: no wifi > printer not ready > queue > green
+        if (!status.ssid) {
+            // No WiFi = Red
+            this.components.led.setColor(255, 0, 0, 300);
+        } else if (status.status === 'calibrating') {
+            // Printer calibrating = Pulsing white
+            this.components.led.pulse(255, 255, 255, 1000);
+        } else if (status.status !== 'ready') {
+            // Printer not ready = Orange
+            this.components.led.setColor(255, 165, 0, 300);
         } else if (status.queueLength > 0) {
-            this.components.led.setColor(0, 0, 255, 100); // Blue for processing
+            // Queue has items = Blue
+            this.components.led.setColor(0, 0, 255, 300);
         } else {
-            // Show WiFi signal strength
-            const signalColor = this.wifiSignalToColor(status.wifi || 0);
-            this.components.led.setColor(signalColor.r, signalColor.g, signalColor.b, 300);
+            // Everything good = Green
+            this.components.led.setColor(0, 255, 0, 300);
         }
     }
 
