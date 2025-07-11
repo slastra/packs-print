@@ -117,7 +117,22 @@ class Monitor extends EventEmitter {
 
     async getWifiStatus() {
         try {
-            const { stdout } = await execAsync(`iwconfig ${this.wifiInterface} 2>/dev/null`);
+            // Try iwconfig with full path first
+            let stdout;
+            try {
+                const result = await execAsync(`/usr/sbin/iwconfig ${this.wifiInterface} 2>/dev/null || /sbin/iwconfig ${this.wifiInterface} 2>/dev/null || iwconfig ${this.wifiInterface} 2>/dev/null`);
+                stdout = result.stdout;
+            } catch (iwconfigError) {
+                // Fallback to alternative methods
+                try {
+                    const result = await execAsync(`iw dev ${this.wifiInterface} link 2>/dev/null`);
+                    return this.parseIwOutput(result.stdout);
+                } catch (iwError) {
+                    // Try cat /proc/net/wireless as final fallback
+                    const result = await execAsync(`cat /proc/net/wireless 2>/dev/null | grep ${this.wifiInterface}`);
+                    return this.parseWirelessProcOutput(result.stdout);
+                }
+            }
             
             const essidMatch = stdout.match(/ESSID:"([^"]+)"/);
             const signalLevelMatch = stdout.match(/Signal level=(-?\d+) dBm/);
@@ -162,6 +177,67 @@ class Monitor extends EventEmitter {
                 connected: false
             };
         }
+    }
+
+    parseIwOutput(stdout) {
+        try {
+            const ssidMatch = stdout.match(/SSID: (.+)/);
+            const signalMatch = stdout.match(/signal: (-?\d+) dBm/);
+            
+            if (ssidMatch) {
+                const ssid = ssidMatch[1];
+                let wifi = 0;
+                let signalDbm = null;
+
+                if (signalMatch) {
+                    signalDbm = parseInt(signalMatch[1], 10);
+                    wifi = Math.max(0, Math.min(1, (signalDbm + 90) / 60));
+                }
+
+                return {
+                    ssid,
+                    wifi: Number(wifi.toFixed(2)),
+                    signalDbm,
+                    connected: true
+                };
+            }
+        } catch (error) {
+            console.debug('Error parsing iw output:', error.message);
+        }
+        
+        return {
+            ssid: null,
+            wifi: 0,
+            signalDbm: null,
+            connected: false
+        };
+    }
+
+    parseWirelessProcOutput(stdout) {
+        try {
+            // Format: interface status quality signal noise
+            const parts = stdout.trim().split(/\s+/);
+            if (parts.length >= 4) {
+                const quality = parseInt(parts[2], 10);
+                const signal = parseInt(parts[3], 10);
+                
+                return {
+                    ssid: 'connected', // Can't get SSID from proc
+                    wifi: Math.max(0, Math.min(1, quality / 70)), // Assume max quality 70
+                    signalDbm: signal,
+                    connected: true
+                };
+            }
+        } catch (error) {
+            console.debug('Error parsing wireless proc output:', error.message);
+        }
+        
+        return {
+            ssid: null,
+            wifi: 0,
+            signalDbm: null,
+            connected: false
+        };
     }
 
     async getPrinterStatus() {
