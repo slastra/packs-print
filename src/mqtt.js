@@ -170,7 +170,6 @@ class MqttClient extends EventEmitter {
         try {
             const statusData = {
                 ...status,
-                online: true,
                 timestamp: new Date().toISOString()
             };
 

@@ -92,18 +92,14 @@ class Monitor extends EventEmitter {
 
     async checkStatus() {
         try {
-            const [wifiStatus, printerStatus, printerHardwareStatus, usbStatus] = await Promise.all([
+            const [wifiStatus, printerStatus] = await Promise.all([
                 this.getWifiStatus(),
-                this.getPrinterStatus(),
-                this.getPrinterHardwareStatus(),
-                this.getUsbStatus()
+                this.getPrinterStatus()
             ]);
 
             const status = {
                 ...wifiStatus,
                 ...printerStatus,
-                ...printerHardwareStatus,
-                ...usbStatus,
                 timestamp: new Date().toISOString(),
                 uptime: process.uptime()
             };
@@ -126,7 +122,7 @@ class Monitor extends EventEmitter {
         }
 
         // Check for significant changes
-        const significantFields = ['ssid', 'wifi', 'printer', 'printerHardwareStatus', 'usbConnected'];
+        const significantFields = ['ssid', 'wifi', 'status'];
         
         for (const field of significantFields) {
             if (this.lastStatus[field] !== newStatus[field]) {
@@ -269,61 +265,16 @@ class Monitor extends EventEmitter {
 
     async getPrinterStatus() {
         try {
-            // Check if the printer device exists and is accessible
-            const { stdout } = await execAsync(`ls -la ${this.printerDevice} 2>/dev/null`);
-            
-            if (stdout.trim()) {
-                // Check if it's writable
-                try {
-                    await execAsync(`test -w ${this.printerDevice}`);
-                    return {
-                        printer: 'ready',
-                        deviceAvailable: true
-                    };
-                } catch (writeError) {
-                    return {
-                        printer: 'permission denied',
-                        deviceAvailable: false
-                    };
-                }
-            } else {
-                return {
-                    printer: 'device not found',
-                    deviceAvailable: false
-                };
-            }
-        } catch (error) {
-            // If device file doesn't exist, try to get info from system
-            try {
-                const { stdout } = await execAsync('dmesg | grep -i "usb.*printer" | tail -5');
-                if (stdout.includes('printer')) {
-                    return {
-                        printer: 'detected but not accessible',
-                        deviceAvailable: false
-                    };
-                }
-            } catch (dmesgError) {
-                // Ignore dmesg errors
-            }
-
-            return {
-                printer: 'not detected',
-                deviceAvailable: false
-            };
-        }
-    }
-
-    async getPrinterHardwareStatus() {
-        try {
-            // Check if device is accessible first
+            // First check if device is accessible
             await fs.access(this.printerDevice, fs.constants.W_OK);
             
+            // If we can access it, get hardware status
             if (!ioctl) {
                 // Mock status for development
                 return {
-                    printerHardwareStatus: 'ready',
-                    printerStatusCode: 0x18,
-                    printerStatusHex: '0x18'
+                    status: 'ready',
+                    statusCode: 0x18,
+                    statusHex: '0x18'
                 };
             }
 
@@ -331,33 +282,33 @@ class Monitor extends EventEmitter {
             const buffer = Buffer.alloc(1);
             
             ioctl(fd, LPGETSTATUS, buffer);
-            const status = buffer[0];
+            const statusCode = buffer[0];
             
             fsSync.closeSync(fd);
             
             // Log status changes
-            if (status !== this.lastPrinterHardwareStatus) {
-                const statusString = this.printerStatusToString(status);
-                console.log(`🖨️  Printer hardware status changed: ${statusString} (0x${status.toString(16)})`);
-                this.lastPrinterHardwareStatus = status;
+            if (statusCode !== this.lastPrinterHardwareStatus) {
+                const statusString = this.printerStatusToString(statusCode);
+                console.log(`🖨️  Printer status changed: ${statusString} (0x${statusCode.toString(16)})`);
+                this.lastPrinterHardwareStatus = statusCode;
             }
             
             return {
-                printerHardwareStatus: this.printerStatusToString(status),
-                printerStatusCode: status,
-                printerStatusHex: `0x${status.toString(16)}`
+                status: this.printerStatusToString(statusCode),
+                statusCode: statusCode,
+                statusHex: `0x${statusCode.toString(16)}`
             };
         } catch (error) {
             // Device not available or error reading
             if (this.lastPrinterHardwareStatus !== null) {
-                console.log('🖨️  Printer hardware status changed: device not available');
+                console.log('🖨️  Printer status changed: disconnected');
                 this.lastPrinterHardwareStatus = null;
             }
             
             return {
-                printerHardwareStatus: 'device not available',
-                printerStatusCode: null,
-                printerStatusHex: null
+                status: 'disconnected',
+                statusCode: null,
+                statusHex: null
             };
         }
     }
@@ -379,35 +330,7 @@ class Monitor extends EventEmitter {
         }
     }
 
-    async getUsbStatus() {
-        if (!usb) {
-            // Mock USB status for development
-            return {
-                usbConnected: true,
-                deviceCount: 1
-            };
-        }
-
-        try {
-            const devices = usb.getDeviceList();
-            const printerDevices = devices.filter(
-                device => device.deviceDescriptor.idVendor === this.printerVendorId
-            );
-
-            return {
-                usbConnected: printerDevices.length > 0,
-                deviceCount: printerDevices.length,
-                totalUsbDevices: devices.length
-            };
-        } catch (error) {
-            console.error('Error getting USB status:', error);
-            return {
-                usbConnected: false,
-                deviceCount: 0,
-                error: error.message
-            };
-        }
-    }
+    // Removed getUsbStatus - redundant with printer status
 
     async getSystemInfo() {
         try {
