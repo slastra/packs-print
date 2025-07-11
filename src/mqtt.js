@@ -179,6 +179,8 @@ class MqttClient extends EventEmitter {
                 retain: true
             });
             
+            console.log(`📡 Published status to MQTT: ${JSON.stringify(statusData, null, 2)}`);
+            
         } catch (error) {
             console.error('Error publishing status:', error);
         }

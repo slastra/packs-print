@@ -32,6 +32,7 @@ const PRINTER_STATUS = {
     READY: 0x18,
     PAPER_OUT: 0x30,
     CALIBRATING: 0x50,
+    LOADING: 0xb0,
     ERROR: 0x08
 };
 
@@ -369,6 +370,8 @@ class Monitor extends EventEmitter {
                 return 'paper out';
             case PRINTER_STATUS.CALIBRATING:
                 return 'calibrating';
+            case PRINTER_STATUS.LOADING:
+                return 'loading';
             case PRINTER_STATUS.ERROR:
                 return 'error';
             default:
