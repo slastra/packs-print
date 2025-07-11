@@ -100,7 +100,9 @@ class Printer extends EventEmitter {
             
             // Emit status change event if different
             if (status !== this.lastStatus) {
-                this.emit('statusChanged', this.statusToString(status));
+                const statusString = this.statusToString(status);
+                console.log(`🖨️  Printer status changed: ${statusString} (0x${status.toString(16)})`);
+                this.emit('statusChanged', statusString);
                 this.lastStatus = status;
             }
             
@@ -110,6 +112,7 @@ class Printer extends EventEmitter {
             
             // Device might have been disconnected
             this.deviceAvailable = false;
+            console.log('🖨️  Printer status changed: device disconnected');
             this.emit('statusChanged', 'device disconnected');
             
             return PRINTER_STATUS.ERROR;
