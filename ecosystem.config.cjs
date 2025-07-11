@@ -17,13 +17,13 @@ module.exports = {
 
   deploy: {
     production: {
-      user: 'pi',
-      host: 'rp30',
+      user: process.env.DEPLOY_USER || 'shaun',
+      host: process.env.DEPLOY_HOST || 'rp30',
       ref: 'origin/main',
-      repo: 'git@github.com:yourusername/packs-print.git', // Update this
-      path: '/home/pi/packs-print',
+      repo: process.env.DEPLOY_REPO || 'https://github.com/slastra/packs-print.git',
+      path: process.env.DEPLOY_PATH || '/home/shaun/packs-print',
       'pre-deploy-local': '',
-      'post-deploy': 'npm install && pm2 reload ecosystem.config.js --env production',
+      'post-deploy': 'npm install && pm2 reload ecosystem.config.cjs --env production',
       'pre-setup': ''
     }
   }

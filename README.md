@@ -176,10 +176,33 @@ Environment=NODE_ENV=production
 WantedBy=multi-user.target
 ```
 
-### Remote Testing
+### PM2 Deployment
+
+1. **Set deployment environment variables (optional):**
+   ```bash
+   export DEPLOY_USER=your-username
+   export DEPLOY_HOST=your-hostname
+   export DEPLOY_REPO=https://github.com/your-username/packs-print.git
+   export DEPLOY_PATH=/home/your-username/packs-print
+   ```
+
+2. **Deploy to Raspberry Pi:**
+   ```bash
+   # First time setup
+   npm run deploy:setup
+   
+   # Deploy updates
+   npm run deploy
+   
+   # Monitor remotely
+   npm run pm2:monitor
+   npm run pm2:logs
+   ```
+
+### Manual Testing
 
 ```bash
-# Deploy to Raspberry Pi
+# Deploy to Raspberry Pi manually
 rsync -av . rp30:~/packs-print/
 
 # SSH and test
