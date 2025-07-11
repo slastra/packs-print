@@ -2,6 +2,8 @@ import { EventEmitter } from 'events';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { createRequire } from 'module';
+import { promises as fs } from 'fs';
+import fsSync from 'fs';
 
 const execAsync = promisify(exec);
 const require = createRequire(import.meta.url);
@@ -15,6 +17,24 @@ try {
     usb = null;
 }
 
+// Try to import ioctl for printer status
+let ioctl;
+try {
+    ioctl = require('ioctl');
+} catch (error) {
+    console.warn('ioctl module not available, using mock implementation');
+    ioctl = null;
+}
+
+// Printer status constants
+const LPGETSTATUS = 0x060b;
+const PRINTER_STATUS = {
+    READY: 0x18,
+    PAPER_OUT: 0x30,
+    CALIBRATING: 0x50,
+    ERROR: 0x08
+};
+
 class Monitor extends EventEmitter {
     constructor(config) {
         super();
@@ -24,9 +44,13 @@ class Monitor extends EventEmitter {
         this.monitorInterval = null;
         this.running = false;
         this.lastStatus = null;
+        this.lastPrinterHardwareStatus = null;
         
         // Printer vendor ID for USB detection
         this.printerVendorId = parseInt(process.env.PRINTER_VENDOR_ID || '0x09c5', 16);
+        
+        // Printer device path
+        this.printerDevice = process.env.PRINTER_DEVICE || '/dev/usb/lp0';
     }
 
     start() {
@@ -67,15 +91,17 @@ class Monitor extends EventEmitter {
 
     async checkStatus() {
         try {
-            const [wifiStatus, printerStatus, usbStatus] = await Promise.all([
+            const [wifiStatus, printerStatus, printerHardwareStatus, usbStatus] = await Promise.all([
                 this.getWifiStatus(),
                 this.getPrinterStatus(),
+                this.getPrinterHardwareStatus(),
                 this.getUsbStatus()
             ]);
 
             const status = {
                 ...wifiStatus,
                 ...printerStatus,
+                ...printerHardwareStatus,
                 ...usbStatus,
                 timestamp: new Date().toISOString(),
                 uptime: process.uptime()
@@ -99,7 +125,7 @@ class Monitor extends EventEmitter {
         }
 
         // Check for significant changes
-        const significantFields = ['ssid', 'wifi', 'printer', 'usbConnected'];
+        const significantFields = ['ssid', 'wifi', 'printer', 'printerHardwareStatus', 'usbConnected'];
         
         for (const field of significantFields) {
             if (this.lastStatus[field] !== newStatus[field]) {
@@ -241,16 +267,14 @@ class Monitor extends EventEmitter {
     }
 
     async getPrinterStatus() {
-        const devicePath = process.env.PRINTER_DEVICE || '/dev/usb/lp0';
-        
         try {
             // Check if the printer device exists and is accessible
-            const { stdout } = await execAsync(`ls -la ${devicePath} 2>/dev/null`);
+            const { stdout } = await execAsync(`ls -la ${this.printerDevice} 2>/dev/null`);
             
             if (stdout.trim()) {
                 // Check if it's writable
                 try {
-                    await execAsync(`test -w ${devicePath}`);
+                    await execAsync(`test -w ${this.printerDevice}`);
                     return {
                         printer: 'ready',
                         deviceAvailable: true
@@ -285,6 +309,70 @@ class Monitor extends EventEmitter {
                 printer: 'not detected',
                 deviceAvailable: false
             };
+        }
+    }
+
+    async getPrinterHardwareStatus() {
+        try {
+            // Check if device is accessible first
+            await fs.access(this.printerDevice, fs.constants.W_OK);
+            
+            if (!ioctl) {
+                // Mock status for development
+                return {
+                    printerHardwareStatus: 'ready',
+                    printerStatusCode: 0x18,
+                    printerStatusHex: '0x18'
+                };
+            }
+
+            const fd = fsSync.openSync(this.printerDevice, 'r+');
+            const buffer = Buffer.alloc(1);
+            
+            ioctl(fd, LPGETSTATUS, buffer);
+            const status = buffer[0];
+            
+            fsSync.closeSync(fd);
+            
+            // Log status changes
+            if (status !== this.lastPrinterHardwareStatus) {
+                const statusString = this.printerStatusToString(status);
+                console.log(`🖨️  Printer hardware status changed: ${statusString} (0x${status.toString(16)})`);
+                this.lastPrinterHardwareStatus = status;
+            }
+            
+            return {
+                printerHardwareStatus: this.printerStatusToString(status),
+                printerStatusCode: status,
+                printerStatusHex: `0x${status.toString(16)}`
+            };
+        } catch (error) {
+            // Device not available or error reading
+            if (this.lastPrinterHardwareStatus !== null) {
+                console.log('🖨️  Printer hardware status changed: device not available');
+                this.lastPrinterHardwareStatus = null;
+            }
+            
+            return {
+                printerHardwareStatus: 'device not available',
+                printerStatusCode: null,
+                printerStatusHex: null
+            };
+        }
+    }
+
+    printerStatusToString(status) {
+        switch (status) {
+            case PRINTER_STATUS.READY:
+                return 'ready';
+            case PRINTER_STATUS.PAPER_OUT:
+                return 'paper out';
+            case PRINTER_STATUS.CALIBRATING:
+                return 'calibrating';
+            case PRINTER_STATUS.ERROR:
+                return 'error';
+            default:
+                return `unknown (0x${status.toString(16)})`;
         }
     }
 
