@@ -178,12 +178,11 @@ WantedBy=multi-user.target
 
 ### PM2 Deployment
 
-1. **Set deployment environment variables (optional):**
+1. **Set deployment environment variables:**
    ```bash
-   export DEPLOY_USER=your-username
-   export DEPLOY_HOST=your-hostname
-   export DEPLOY_REPO=https://github.com/your-username/packs-print.git
-   export DEPLOY_PATH=/home/your-username/packs-print
+   # Copy and customize environment
+   cp .env.example .env
+   # Edit .env with your deployment settings
    ```
 
 2. **Deploy to Raspberry Pi:**
