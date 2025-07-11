@@ -62,7 +62,7 @@ class PrinterApp extends EventEmitter {
             // Initialize printer (don't fail if device not available)
             const printerInitialized = await this.components.printer.initialize();
             if (!printerInitialized) {
-                console.log('✓ Application will continue without printer device');
+                // Application continues without printer
             }
 
             // Start monitoring
@@ -72,7 +72,7 @@ class PrinterApp extends EventEmitter {
             console.log('Connecting to MQTT broker at servicez.cloud:1883');
             await this.components.mqtt.connect();
 
-            console.log('✓ All components initialized successfully');
+            console.log('Ready');
             
         } catch (error) {
             console.error('Failed to initialize:', error);
@@ -130,23 +130,26 @@ class PrinterApp extends EventEmitter {
                 media: this.config.printer.media
             };
             
-            this.components.mqtt.publishStatus(enhancedStatus);
+            // Only publish if MQTT is connected
+            if (this.components.mqtt.connected) {
+                this.components.mqtt.publishStatus(enhancedStatus);
+            }
             this.updateStatusLed(enhancedStatus);
         });
 
         // MQTT connection events
         this.components.mqtt.on('connecting', () => {
-            console.log('🔄 Connecting to MQTT...');
+            // Connecting to MQTT
             this.components.led.pulse(255, 255, 0, 1000); // Pulsing yellow while connecting
         });
 
         this.components.mqtt.on('connected', () => {
-            console.log('✓ MQTT connected');
+            console.log('MQTT connected');
             // LED will be updated by next status update
         });
 
         this.components.mqtt.on('disconnected', () => {
-            console.log('✗ MQTT disconnected');
+            console.log('MQTT disconnected');
             // Don't override LED here - let status update handle it
         });
 

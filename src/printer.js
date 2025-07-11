@@ -12,7 +12,7 @@ let ioctl;
 try {
     ioctl = require('ioctl');
 } catch (error) {
-    console.warn('ioctl module not available, using mock implementation');
+    console.log('ioctl module not available, using fallback implementation');
     ioctl = null;
 }
 
@@ -51,13 +51,12 @@ class Printer extends EventEmitter {
             const status = await this.getStatus();
             this.lastStatus = status;
             
-            console.log(`✓ Printer initialized - Status: ${this.statusToString(status)}`);
+            console.log(`Printer initialized: ${this.statusToString(status)}`);
             this.initializationFailed = false;
             
             return true;
         } catch (error) {
-            console.warn(`⚠ Printer device not available: ${error.message}`);
-            console.warn('  Printer will operate in offline mode until device becomes available');
+            console.log(`Printer offline: ${error.message}`);
             
             this.deviceAvailable = false;
             this.initializationFailed = true;
@@ -73,7 +72,7 @@ class Printer extends EventEmitter {
     async checkDeviceAccess() {
         try {
             await fs.access(this.device, fs.constants.W_OK);
-            console.log(`✓ Device ${this.device} is accessible`);
+            // Device is accessible
         } catch (error) {
             throw new Error(`Cannot access printer device ${this.device}: ${error.message}`);
         }

@@ -13,7 +13,7 @@ let usb;
 try {
     usb = require('usb');
 } catch (error) {
-    console.warn('USB module not available, using mock implementation');
+    console.log('USB module not available, using fallback implementation');
     usb = null;
 }
 
@@ -22,7 +22,7 @@ let ioctl;
 try {
     ioctl = require('ioctl');
 } catch (error) {
-    console.warn('ioctl module not available, using mock implementation');
+    console.log('ioctl module not available, using fallback implementation');
     ioctl = null;
 }
 
@@ -289,7 +289,7 @@ class Monitor extends EventEmitter {
             // Log status changes
             if (statusCode !== this.lastPrinterHardwareStatus) {
                 const statusString = this.printerStatusToString(statusCode);
-                console.log(`🖨️  Printer status changed: ${statusString} (0x${statusCode.toString(16)})`);
+                console.log(`Printer status: ${statusString}`);
                 this.lastPrinterHardwareStatus = statusCode;
             }
             
@@ -301,7 +301,7 @@ class Monitor extends EventEmitter {
         } catch (error) {
             // Device not available or error reading
             if (this.lastPrinterHardwareStatus !== null) {
-                console.log('🖨️  Printer status changed: disconnected');
+                console.log('Printer status: disconnected');
                 this.lastPrinterHardwareStatus = null;
             }
             

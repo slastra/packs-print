@@ -61,7 +61,7 @@ class MqttClient extends EventEmitter {
 
     setupEventHandlers() {
         this.client.on('connect', () => {
-            console.log('✓ Connected to MQTT broker');
+            // Connected to MQTT broker
             this.connected = true;
             this.reconnectAttempts = 0;
             
@@ -73,7 +73,7 @@ class MqttClient extends EventEmitter {
                     console.error('MQTT subscription error:', err);
                     this.emit('error', err);
                 } else {
-                    console.log(`✓ Subscribed to topics: ${subscribeTopics.join(', ')}`);
+                    // Subscribed successfully
                     this.emit('connected');
                 }
             });
@@ -95,14 +95,14 @@ class MqttClient extends EventEmitter {
         });
 
         this.client.on('offline', () => {
-            console.log('MQTT client offline');
+            // MQTT client offline
             this.connected = false;
             this.emit('disconnected');
         });
 
         this.client.on('reconnect', () => {
             this.reconnectAttempts++;
-            console.log(`MQTT reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
+            // Reconnecting
             
             if (this.reconnectAttempts >= this.maxReconnectAttempts) {
                 console.error('Max MQTT reconnect attempts reached');
@@ -144,7 +144,7 @@ class MqttClient extends EventEmitter {
                 topic
             };
 
-            console.log(`Received print job: ${template} (${copies} copies)`);
+            console.log(`Print job: ${template} x${copies}`);
             
             this.emit('printJob', job);
             
@@ -163,7 +163,7 @@ class MqttClient extends EventEmitter {
 
     async publishStatus(status) {
         if (!this.connected) {
-            console.warn('Cannot publish status: MQTT not connected');
+            // Silently skip publishing when not connected
             return;
         }
 
@@ -177,8 +177,6 @@ class MqttClient extends EventEmitter {
                 qos: 1,
                 retain: true
             });
-            
-            console.log(`📡 Published status to MQTT: ${JSON.stringify(statusData, null, 2)}`);
             
         } catch (error) {
             console.error('Error publishing status:', error);

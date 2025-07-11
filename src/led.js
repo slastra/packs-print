@@ -17,10 +17,10 @@ class LedController extends EventEmitter {
         try {
             // Check if rgbd daemon is running by testing FIFO
             await this.checkFifoAvailable();
-            console.log('✓ LED controller initialized (rgbd daemon available)');
+            // LED controller initialized
             this.available = true;
         } catch (error) {
-            console.warn('⚠ LED controller not available:', error.message);
+            console.log('LED controller not available:', error.message);
             this.available = false;
         }
     }
@@ -35,7 +35,7 @@ class LedController extends EventEmitter {
 
     async setColor(r, g, b, duration = 0) {
         if (!this.available) {
-            console.debug(`LED: would set color RGB(${r}, ${g}, ${b})`);
+            // Would set LED color
             return;
         }
 
@@ -58,7 +58,7 @@ class LedController extends EventEmitter {
             });
 
             await fs.writeFile(LED_CONTROL_FIFO, command + '\n');
-            console.debug(`LED: RGB(${scaledR}, ${scaledG}, ${scaledB}) duration:${duration}ms`);
+            // LED color set
             
         } catch (error) {
             console.error('Error setting LED color:', error);
@@ -68,7 +68,7 @@ class LedController extends EventEmitter {
 
     async pulse(r, g, b, interval = 500) {
         if (!this.available) {
-            console.debug(`LED: would pulse RGB(${r}, ${g}, ${b})`);
+            // Would pulse LED
             return;
         }
 
