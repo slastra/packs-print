@@ -8,14 +8,7 @@ import fsSync from 'fs';
 const execAsync = promisify(exec);
 const require = createRequire(import.meta.url);
 
-// Try to import usb module for USB detection
-let usb;
-try {
-    usb = require('usb');
-} catch (error) {
-    console.log('USB module not available, using fallback implementation');
-    usb = null;
-}
+// USB module removed - not needed with direct printer status monitoring
 
 // Try to import ioctl for printer status
 let ioctl;
@@ -46,9 +39,6 @@ class Monitor extends EventEmitter {
         this.running = false;
         this.lastStatus = null;
         this.lastPrinterHardwareStatus = null;
-        
-        // Printer vendor ID for USB detection
-        this.printerVendorId = parseInt(process.env.PRINTER_VENDOR_ID || '0x09c5', 16);
         
         // Printer device path
         this.printerDevice = process.env.PRINTER_DEVICE || '/dev/usb/lp0';
@@ -330,7 +320,7 @@ class Monitor extends EventEmitter {
         }
     }
 
-    // Removed getUsbStatus - redundant with printer status
+    // USB status checking removed - redundant with direct printer status monitoring
 
     async getSystemInfo() {
         try {

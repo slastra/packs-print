@@ -15,7 +15,6 @@ class MqttClient extends EventEmitter {
     async connect() {
         try {
             console.log(`Connecting to MQTT broker at ${this.config.host}:${this.config.port}`);
-            
             this.client = mqtt.connect({
                 host: this.config.host,
                 port: this.config.port,

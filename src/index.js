@@ -69,7 +69,6 @@ class PrinterApp extends EventEmitter {
             this.components.monitor.start();
 
             // Connect MQTT
-            console.log('Connecting to MQTT broker at servicez.cloud:1883');
             await this.components.mqtt.connect();
 
             console.log('Ready');
