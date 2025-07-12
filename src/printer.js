@@ -12,7 +12,7 @@ let ioctl;
 try {
     ioctl = require('ioctl');
 } catch (error) {
-    console.log('ioctl module not available, using fallback implementation');
+    console.log('ioctl module not available, using fallback implementation:', error.message);
     ioctl = null;
 }
 
@@ -41,30 +41,30 @@ class Printer extends EventEmitter {
 
     async initialize() {
         console.log(`Initializing printer on ${this.device}`);
-        
+
         try {
             // Check device access
             await this.checkDeviceAccess();
             this.deviceAvailable = true;
-            
+
             // Get initial status
             const status = await this.getStatus();
             this.lastStatus = status;
-            
+
             console.log(`Printer initialized: ${this.statusToString(status)}`);
             this.initializationFailed = false;
-            
+
             return true;
         } catch (error) {
             console.log(`Printer offline: ${error.message}`);
-            
+
             this.deviceAvailable = false;
             this.initializationFailed = true;
             this.lastStatus = PRINTER_STATUS.ERROR;
-            
+
             // Don't emit error - this is a recoverable condition
             this.emit('statusChanged', 'device not available');
-            
+
             return false;
         }
     }
@@ -92,27 +92,27 @@ class Printer extends EventEmitter {
         try {
             const fd = fsSync.openSync(this.device, 'r+');
             const buffer = Buffer.alloc(1);
-            
+
             ioctl(fd, LPGETSTATUS, buffer);
-            const status = buffer[0];
-            
+            const [status] = buffer;
+
             fsSync.closeSync(fd);
-            
+
             // Emit status change event if different
             if (status !== this.lastStatus) {
                 const statusString = this.statusToString(status);
                 this.emit('statusChanged', statusString);
                 this.lastStatus = status;
             }
-            
+
             return status;
         } catch (error) {
             console.error('Error getting printer status:', error);
-            
+
             // Device might have been disconnected
             this.deviceAvailable = false;
             this.emit('statusChanged', 'device disconnected');
-            
+
             return PRINTER_STATUS.ERROR;
         }
     }
@@ -121,20 +121,20 @@ class Printer extends EventEmitter {
         if (!this.deviceAvailable) {
             return 'device not available';
         }
-        
+
         switch (status) {
-            case PRINTER_STATUS.READY:
-                return 'ready';
-            case PRINTER_STATUS.PAPER_OUT:
-                return 'paper out';
-            case PRINTER_STATUS.CALIBRATING:
-                return 'calibrating';
-            case PRINTER_STATUS.LOADING:
-                return 'loading';
-            case PRINTER_STATUS.ERROR:
-                return 'error';
-            default:
-                return `unknown (0x${status.toString(16)})`;
+        case PRINTER_STATUS.READY:
+            return 'ready';
+        case PRINTER_STATUS.PAPER_OUT:
+            return 'paper out';
+        case PRINTER_STATUS.CALIBRATING:
+            return 'calibrating';
+        case PRINTER_STATUS.LOADING:
+            return 'loading';
+        case PRINTER_STATUS.ERROR:
+            return 'error';
+        default:
+            return `unknown (0x${status.toString(16)})`;
         }
     }
 
@@ -151,13 +151,13 @@ class Printer extends EventEmitter {
         try {
             const templatePath = path.join(process.cwd(), 'templates', this.media, `${templateName}.epl`);
             const templateSource = await fs.readFile(templatePath, 'utf8');
-            
+
             // Compile template
             const compiled = handlebars.compile(templateSource);
-            
+
             // Cache it
             this.templateCache.set(templateName, compiled);
-            
+
             return compiled;
         } catch (error) {
             throw new Error(`Failed to load template ${templateName}: ${error.message}`);
@@ -212,19 +212,19 @@ class Printer extends EventEmitter {
             // For multiple copies, send the EPL data multiple times
             for (let copy = 1; copy <= copies; copy++) {
                 console.log(`Sending copy ${copy}/${copies}...`);
-                
+
                 await fs.writeFile(this.device, eplData);
-                
+
                 console.log(`✓ Copy ${copy}/${copies} sent successfully`);
-                
+
                 // Small delay between copies
                 if (copy < copies) {
                     await new Promise(resolve => setTimeout(resolve, 100));
                 }
             }
-            
+
             console.log(`✓ All ${copies} copies sent successfully`);
-            
+
         } catch (error) {
             throw new Error(`Failed to send to printer: ${error.message}`);
         }
@@ -248,28 +248,28 @@ class Printer extends EventEmitter {
 
     async retryConnection() {
         console.log('Attempting to reconnect to printer device...');
-        
+
         try {
             await this.checkDeviceAccess();
-            
+
             if (!this.deviceAvailable) {
                 this.deviceAvailable = true;
                 this.initializationFailed = false;
-                
+
                 // Get fresh status
                 const status = await this.getStatus();
                 this.lastStatus = status;
-                
+
                 console.log(`✓ Printer reconnected - Status: ${this.statusToString(status)}`);
                 this.emit('statusChanged', 'reconnected');
-                
+
                 return true;
             }
         } catch (error) {
             console.debug('Printer device still not available:', error.message);
             return false;
         }
-        
+
         return false;
     }
 

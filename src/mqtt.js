@@ -196,7 +196,7 @@ class MqttClient extends EventEmitter {
                 method: 'direct'
             };
 
-            await this.publish(`rez/prints/${this.hostname}/success`, successData, {
+            await this.publish(`packs/labels/${this.hostname}/success`, successData, {
                 qos: 1
             });
 
@@ -216,7 +216,7 @@ class MqttClient extends EventEmitter {
                 timestamp: new Date().toISOString()
             };
 
-            await this.publish(`rez/prints/${this.hostname}/failure`, failureData, {
+            await this.publish(`packs/labels/${this.hostname}/failure`, failureData, {
                 qos: 1
             });
 

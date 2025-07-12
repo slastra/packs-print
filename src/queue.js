@@ -154,7 +154,7 @@ class PrintQueue extends EventEmitter {
             runtime: Math.floor(runtime / 1000), // seconds
             queueLength: this.queue.length,
             processing: this.processing,
-            successRate: this.stats.totalJobs > 0 ? 
+            successRate: this.stats.totalJobs > 0 ?
                 (this.stats.completedJobs / this.stats.totalJobs * 100).toFixed(1) : 0
         };
     }
@@ -177,10 +177,10 @@ class PrintQueue extends EventEmitter {
 
         const clearedCount = this.queue.length;
         this.queue = [];
-        
+
         console.log(`Queue cleared: ${clearedCount} jobs removed`);
         this.emit('queueCleared', clearedCount);
-        
+
         return true;
     }
 
@@ -190,7 +190,7 @@ class PrintQueue extends EventEmitter {
         }
 
         console.log('Draining queue...');
-        
+
         return new Promise((resolve) => {
             if (this.queue.length === 0 && !this.processing) {
                 resolve();

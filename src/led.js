@@ -29,7 +29,7 @@ class LedController extends EventEmitter {
         try {
             await fs.access(LED_CONTROL_FIFO, fs.constants.W_OK);
         } catch (error) {
-            throw new Error(`LED control FIFO not accessible: ${LED_CONTROL_FIFO}`);
+            throw new Error(`LED control FIFO not accessible: ${LED_CONTROL_FIFO} - ${error.message}`);
         }
     }
 
@@ -57,9 +57,9 @@ class LedController extends EventEmitter {
                 duration: duration
             });
 
-            await fs.writeFile(LED_CONTROL_FIFO, command + '\n');
+            await fs.writeFile(LED_CONTROL_FIFO, `${command  }\n`);
             // LED color set
-            
+
         } catch (error) {
             console.error('Error setting LED color:', error);
             this.emit('error', error);
@@ -95,7 +95,7 @@ class LedController extends EventEmitter {
     async setBrightness(brightness) {
         this.brightness = Math.max(0, Math.min(1, brightness));
         console.log(`LED brightness set to: ${(this.brightness * 100).toFixed(1)}%`);
-        
+
         // Reapply current color with new brightness
         const { r, g, b } = this.currentColor;
         await this.setColor(r, g, b);
@@ -209,7 +209,7 @@ class LedController extends EventEmitter {
     async showWifiSignal(strength) {
         // strength should be 0-1
         const normalizedStrength = Math.max(0, Math.min(1, strength));
-        
+
         if (normalizedStrength > 0.7) {
             await this.green(300); // Strong signal - green
         } else if (normalizedStrength > 0.4) {
@@ -224,9 +224,9 @@ class LedController extends EventEmitter {
     // Shutdown sequence
     async shutdown() {
         console.log('Shutting down LED controller...');
-        
+
         this.stopPulse();
-        
+
         // Fade out sequence
         if (this.available) {
             try {
@@ -238,7 +238,7 @@ class LedController extends EventEmitter {
                 console.error('Error during LED shutdown:', error);
             }
         }
-        
+
         console.log('✓ LED controller shutdown complete');
     }
 
@@ -254,7 +254,7 @@ class LedController extends EventEmitter {
     // Test method for development
     async testSequence() {
         console.log('Starting LED test sequence...');
-        
+
         const colors = [
             { name: 'Red', r: 255, g: 0, b: 0 },
             { name: 'Green', r: 0, g: 255, b: 0 },

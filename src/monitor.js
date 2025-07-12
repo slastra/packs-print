@@ -39,7 +39,7 @@ class Monitor extends EventEmitter {
         this.running = false;
         this.lastStatus = null;
         this.lastPrinterHardwareStatus = null;
-        
+
         // Printer device path
         this.printerDevice = process.env.PRINTER_DEVICE || '/dev/usb/lp0';
     }
@@ -113,7 +113,7 @@ class Monitor extends EventEmitter {
 
         // Check for significant changes
         const significantFields = ['ssid', 'wifi', 'status'];
-        
+
         for (const field of significantFields) {
             if (this.lastStatus[field] !== newStatus[field]) {
                 return true;
@@ -146,7 +146,7 @@ class Monitor extends EventEmitter {
                     return this.parseWirelessProcOutput(result.stdout);
                 }
             }
-            
+
             const essidMatch = stdout.match(/ESSID:"([^"]+)"/);
             const signalLevelMatch = stdout.match(/Signal level=(-?\d+) dBm/);
             const linkQualityMatch = stdout.match(/Link Quality=(\d+)\/(\d+)/);
@@ -196,7 +196,7 @@ class Monitor extends EventEmitter {
         try {
             const ssidMatch = stdout.match(/SSID: (.+)/);
             const signalMatch = stdout.match(/signal: (-?\d+) dBm/);
-            
+
             if (ssidMatch) {
                 const ssid = ssidMatch[1];
                 let wifi = 0;
@@ -217,7 +217,7 @@ class Monitor extends EventEmitter {
         } catch (error) {
             console.debug('Error parsing iw output:', error.message);
         }
-        
+
         return {
             ssid: null,
             wifi: 0,
@@ -233,7 +233,7 @@ class Monitor extends EventEmitter {
             if (parts.length >= 4) {
                 const quality = parseInt(parts[2], 10);
                 const signal = parseInt(parts[3], 10);
-                
+
                 return {
                     ssid: 'connected', // Can't get SSID from proc
                     wifi: Math.max(0, Math.min(1, quality / 70)), // Assume max quality 70
@@ -244,7 +244,7 @@ class Monitor extends EventEmitter {
         } catch (error) {
             console.debug('Error parsing wireless proc output:', error.message);
         }
-        
+
         return {
             ssid: null,
             wifi: 0,
@@ -257,7 +257,7 @@ class Monitor extends EventEmitter {
         try {
             // First check if device is accessible
             await fs.access(this.printerDevice, fs.constants.W_OK);
-            
+
             // If we can access it, get hardware status
             if (!ioctl) {
                 // Mock status for development
@@ -270,19 +270,19 @@ class Monitor extends EventEmitter {
 
             const fd = fsSync.openSync(this.printerDevice, 'r+');
             const buffer = Buffer.alloc(1);
-            
+
             ioctl(fd, LPGETSTATUS, buffer);
             const statusCode = buffer[0];
-            
+
             fsSync.closeSync(fd);
-            
+
             // Log status changes
             if (statusCode !== this.lastPrinterHardwareStatus) {
                 const statusString = this.printerStatusToString(statusCode);
                 console.log(`Printer status: ${statusString}`);
                 this.lastPrinterHardwareStatus = statusCode;
             }
-            
+
             return {
                 status: this.printerStatusToString(statusCode),
                 statusCode: statusCode,
@@ -294,7 +294,7 @@ class Monitor extends EventEmitter {
                 console.log('Printer status: disconnected');
                 this.lastPrinterHardwareStatus = null;
             }
-            
+
             return {
                 status: 'disconnected',
                 statusCode: null,
@@ -305,18 +305,18 @@ class Monitor extends EventEmitter {
 
     printerStatusToString(status) {
         switch (status) {
-            case PRINTER_STATUS.READY:
-                return 'ready';
-            case PRINTER_STATUS.PAPER_OUT:
-                return 'paper out';
-            case PRINTER_STATUS.CALIBRATING:
-                return 'calibrating';
-            case PRINTER_STATUS.LOADING:
-                return 'loading';
-            case PRINTER_STATUS.ERROR:
-                return 'error';
-            default:
-                return `unknown (0x${status.toString(16)})`;
+        case PRINTER_STATUS.READY:
+            return 'ready';
+        case PRINTER_STATUS.PAPER_OUT:
+            return 'paper out';
+        case PRINTER_STATUS.CALIBRATING:
+            return 'calibrating';
+        case PRINTER_STATUS.LOADING:
+            return 'loading';
+        case PRINTER_STATUS.ERROR:
+            return 'error';
+        default:
+            return `unknown (0x${status.toString(16)})`;
         }
     }
 
@@ -369,11 +369,11 @@ class Monitor extends EventEmitter {
             const { stdout } = await execAsync('free -m');
             const lines = stdout.trim().split('\n');
             const memLine = lines[1].split(/\s+/);
-            
+
             const total = parseInt(memLine[1], 10);
             const used = parseInt(memLine[2], 10);
             const free = parseInt(memLine[3], 10);
-            
+
             return {
                 total,
                 used,
@@ -390,7 +390,7 @@ class Monitor extends EventEmitter {
         try {
             const { stdout } = await execAsync('df -h / | tail -1');
             const parts = stdout.trim().split(/\s+/);
-            
+
             return {
                 total: parts[1],
                 used: parts[2],

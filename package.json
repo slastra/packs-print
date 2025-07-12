@@ -1,7 +1,7 @@
 {
   "name": "packs-print",
   "version": "1.0.0",
-  "description": "Rollo label printer application with direct USB communication",
+  "description": "Packs Print - Modern label printer application with direct USB communication",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
