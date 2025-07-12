@@ -126,6 +126,8 @@ class MqttClient extends EventEmitter {
         try {
             const messageData = JSON.parse(message.toString());
 
+            console.log('Received label message:', JSON.stringify(messageData, null, 2));
+
             // Extract template and copies from message data
             const { template } = messageData;
             const copies = parseInt(messageData.copies) || 1;
@@ -175,6 +177,8 @@ class MqttClient extends EventEmitter {
                 timestamp: new Date().toISOString()
             };
 
+            console.log('Publishing status:', JSON.stringify(statusData, null, 2));
+
             await this.publish(`packs/printers/${this.hostname}/status`, statusData, {
                 qos: 1,
                 retain: true
@@ -209,12 +213,25 @@ class MqttClient extends EventEmitter {
         if (!this.connected) return;
 
         try {
+            // Categorize error types
+            let errorType = 'unknown';
+            if (error.message.includes('Failed to load template') && error.message.includes('ENOENT')) {
+                errorType = 'template_not_found';
+            } else if (error.message.includes('Printer not ready')) {
+                errorType = 'printer_not_ready';
+            } else if (error.message.includes('Printer device not available')) {
+                errorType = 'printer_offline';
+            }
+
             const failureData = {
                 template: job.template,
                 copies: job.copies,
                 error: error.message,
+                errorType: errorType,
                 timestamp: new Date().toISOString()
             };
+
+            console.log('Publishing failure:', JSON.stringify(failureData, null, 2));
 
             await this.publish(`packs/labels/${this.hostname}/failure`, failureData, {
                 qos: 1

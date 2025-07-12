@@ -94,11 +94,9 @@ class Monitor extends EventEmitter {
                 uptime: process.uptime()
             };
 
-            // Only emit if status changed significantly
-            if (this.hasStatusChanged(status)) {
-                this.lastStatus = status;
-                this.emit('statusUpdate', status);
-            }
+            // Always emit status updates for server heartbeat
+            this.lastStatus = status;
+            this.emit('statusUpdate', status);
 
         } catch (error) {
             console.error('Error checking system status:', error);
@@ -106,27 +104,6 @@ class Monitor extends EventEmitter {
         }
     }
 
-    hasStatusChanged(newStatus) {
-        if (!this.lastStatus) {
-            return true;
-        }
-
-        // Check for significant changes
-        const significantFields = ['ssid', 'wifi', 'status'];
-
-        for (const field of significantFields) {
-            if (this.lastStatus[field] !== newStatus[field]) {
-                return true;
-            }
-        }
-
-        // Check if WiFi signal changed significantly (>5%)
-        if (Math.abs((this.lastStatus.wifi || 0) - (newStatus.wifi || 0)) > 0.05) {
-            return true;
-        }
-
-        return false;
-    }
 
     async getWifiStatus() {
         try {
