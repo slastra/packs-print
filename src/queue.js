@@ -71,18 +71,30 @@ class PrintQueue extends EventEmitter {
         this.emit('jobStarted', job);
 
         try {
-            // The actual printing will be handled by the printer module
-            // This is where we would call printer.print(job)
-            // For now, we'll emit an event that the main app can listen to
+            // Emit print request and wait for completion
             this.emit('printRequest', job);
 
-            // Simulate processing time for development
-            if (process.env.NODE_ENV === 'development') {
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
+            // Wait for job to be completed or failed by the main app
+            await new Promise((resolve) => {
+                const onCompleted = (completedJob) => {
+                    if (completedJob.id === job.id) {
+                        this.removeListener('jobCompleted', onCompleted);
+                        this.removeListener('jobFailed', onFailed);
+                        resolve();
+                    }
+                };
 
-            // Mark as completed (this will be called by the main app after successful print)
-            // await this.markJobCompleted(job);
+                const onFailed = (failedJob) => {
+                    if (failedJob.id === job.id) {
+                        this.removeListener('jobCompleted', onCompleted);
+                        this.removeListener('jobFailed', onFailed);
+                        resolve();
+                    }
+                };
+
+                this.on('jobCompleted', onCompleted);
+                this.on('jobFailed', onFailed);
+            });
 
         } catch (error) {
             await this.markJobFailed(job, error);
