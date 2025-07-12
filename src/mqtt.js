@@ -13,6 +13,11 @@ class MqttClient extends EventEmitter {
     }
 
     async connect() {
+        if (this.client && !this.client.disconnected) {
+            console.log('MQTT client already connected or connecting');
+            return;
+        }
+
         try {
             console.log(`Connecting to MQTT broker at ${this.config.host}:${this.config.port}`);
             this.client = mqtt.connect({
@@ -23,7 +28,7 @@ class MqttClient extends EventEmitter {
                 reconnectPeriod: 5000,
                 connectTimeout: 30000,
                 will: {
-                    topic: `rez/printers-ng/${this.hostname}`,
+                    topic: `packs/printers/${this.hostname}/status`,
                     payload: JSON.stringify({
                         online: false,
                         timestamp: new Date().toISOString()
@@ -34,7 +39,7 @@ class MqttClient extends EventEmitter {
             });
 
             this.setupEventHandlers();
-            
+
             return new Promise((resolve, reject) => {
                 const timeout = setTimeout(() => {
                     reject(new Error('MQTT connection timeout'));
@@ -50,7 +55,7 @@ class MqttClient extends EventEmitter {
                     reject(error);
                 });
             });
-            
+
         } catch (error) {
             console.error('MQTT connection failed:', error);
             this.emit('error', error);
@@ -63,10 +68,10 @@ class MqttClient extends EventEmitter {
             // Connected to MQTT broker
             this.connected = true;
             this.reconnectAttempts = 0;
-            
+
             // Subscribe to print job topics
-            const subscribeTopics = [`printers-ng/${this.hostname}/+`];
-            
+            const subscribeTopics = [`packs/labels/${this.hostname}`];
+
             this.client.subscribe(subscribeTopics, (err) => {
                 if (err) {
                     console.error('MQTT subscription error:', err);
@@ -102,7 +107,7 @@ class MqttClient extends EventEmitter {
         this.client.on('reconnect', () => {
             this.reconnectAttempts++;
             // Reconnecting
-            
+
             if (this.reconnectAttempts >= this.maxReconnectAttempts) {
                 console.error('Max MQTT reconnect attempts reached');
                 this.client.end();
@@ -119,22 +124,20 @@ class MqttClient extends EventEmitter {
 
     handleMessage(topic, message) {
         try {
-            const topicParts = topic.split('/');
-            const template = topicParts[2]; // printers-ng/hostname/template
-            
+            const messageData = JSON.parse(message.toString());
+
+            // Extract template and copies from message data
+            const { template } = messageData;
+            const copies = parseInt(messageData.copies) || 1;
+
             if (!template) {
-                console.warn('Invalid topic format:', topic);
+                console.warn('Missing template in message:', messageData);
                 return;
             }
 
-            const messageData = JSON.parse(message.toString());
-            
-            // Extract copies from message data
-            const copies = parseInt(messageData.copies) || 1;
-            
-            // Remove copies from data to avoid template conflicts
-            const { copies: _, ...templateData } = messageData;
-            
+            // Remove template and copies from data to avoid conflicts
+            const { template: _, copies: __, ...templateData } = messageData;
+
             const job = {
                 template,
                 data: templateData,
@@ -144,12 +147,12 @@ class MqttClient extends EventEmitter {
             };
 
             console.log(`Print job: ${template} x${copies}`);
-            
+
             this.emit('printJob', job);
-            
+
         } catch (error) {
             console.error('Error parsing MQTT message:', error);
-            
+
             // Publish error for monitoring
             this.publishError({
                 error: error.message,
@@ -172,11 +175,11 @@ class MqttClient extends EventEmitter {
                 timestamp: new Date().toISOString()
             };
 
-            await this.publish(`rez/printers-ng/${this.hostname}`, statusData, {
+            await this.publish(`packs/printers/${this.hostname}/status`, statusData, {
                 qos: 1,
                 retain: true
             });
-            
+
         } catch (error) {
             console.error('Error publishing status:', error);
         }
@@ -196,7 +199,7 @@ class MqttClient extends EventEmitter {
             await this.publish(`rez/prints/${this.hostname}/success`, successData, {
                 qos: 1
             });
-            
+
         } catch (error) {
             console.error('Error publishing success:', error);
         }
@@ -216,7 +219,7 @@ class MqttClient extends EventEmitter {
             await this.publish(`rez/prints/${this.hostname}/failure`, failureData, {
                 qos: 1
             });
-            
+
         } catch (error) {
             console.error('Error publishing failure:', error);
         }
@@ -226,10 +229,10 @@ class MqttClient extends EventEmitter {
         if (!this.connected) return;
 
         try {
-            await this.publish(`rez/errors/${this.hostname}`, errorData, {
+            await this.publish(`packs/printers/${this.hostname}/errors`, errorData, {
                 qos: 1
             });
-            
+
         } catch (error) {
             console.error('Error publishing error:', error);
         }
@@ -242,7 +245,7 @@ class MqttClient extends EventEmitter {
 
         return new Promise((resolve, reject) => {
             const payload = typeof data === 'string' ? data : JSON.stringify(data);
-            
+
             this.client.publish(topic, payload, options, (error) => {
                 if (error) {
                     reject(error);
@@ -258,11 +261,11 @@ class MqttClient extends EventEmitter {
 
         try {
             // Publish offline status
-            await this.publish(`rez/printers-ng/${this.hostname}`, {
+            await this.publish(`packs/printers/${this.hostname}/status`, {
                 online: false,
                 timestamp: new Date().toISOString()
             }, { qos: 1, retain: true });
-            
+
         } catch (error) {
             console.error('Error publishing offline status:', error);
         }

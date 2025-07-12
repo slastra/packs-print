@@ -118,6 +118,47 @@ class LedController extends EventEmitter {
         await this.setColor(0, 0, 255, duration);
     }
 
+    async startupEffect() {
+        if (!this.available) {
+            // Would show startup LED effect
+            return;
+        }
+
+        try {
+            // Rainbow sweep effect
+            const colors = [
+                [255, 0, 0],    // Red
+                [255, 127, 0],  // Orange
+                [255, 255, 0],  // Yellow
+                [0, 255, 0],    // Green
+                [0, 0, 255],    // Blue
+                [75, 0, 130],   // Indigo
+                [148, 0, 211]   // Violet
+            ];
+
+            // Quick sweep through rainbow
+            for (const [r, g, b] of colors) {
+                await this.setColor(r, g, b, 0);
+                await new Promise(resolve => setTimeout(resolve, 150));
+            }
+
+            // Flash white twice
+            for (let i = 0; i < 2; i++) {
+                await this.setColor(255, 255, 255, 0);
+                await new Promise(resolve => setTimeout(resolve, 200));
+                await this.setColor(0, 0, 0, 0);
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+
+            // Final startup pulse - blue to indicate ready
+            await this.pulse(0, 100, 255, 800);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+        } catch (error) {
+            console.error('Error during LED startup effect:', error);
+        }
+    }
+
     async yellow(duration = 0) {
         await this.setColor(255, 255, 0, duration);
     }

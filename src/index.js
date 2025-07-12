@@ -42,7 +42,7 @@ class PrinterApp extends EventEmitter {
     }
 
     async initialize() {
-        console.log(`Starting Rollo printer integration on ${this.hostname}`);
+        console.log(`Starting Packs Print on ${this.hostname}`);
 
         try {
             // Initialize components
@@ -55,9 +55,9 @@ class PrinterApp extends EventEmitter {
             // Set up event listeners
             this.setupEventListeners();
 
-            // Initialize LED (startup indication)
+            // Initialize LED with cool startup effect
             await this.components.led.initialize();
-            await this.components.led.setColor(255, 255, 255, 100); // White pulse
+            await this.components.led.startupEffect();
 
             // Initialize printer (don't fail if device not available)
             const printerInitialized = await this.components.printer.initialize();
