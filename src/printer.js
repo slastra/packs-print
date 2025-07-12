@@ -38,6 +38,7 @@ class Printer extends EventEmitter {
         this.templateCache = new Map();
         this.deviceAvailable = false;
         this.initializationFailed = false;
+        this.isPrinting = false;
     }
 
     async initialize() {
@@ -83,6 +84,12 @@ class Printer extends EventEmitter {
         // If device is not available, return offline status
         if (!this.deviceAvailable) {
             return PRINTER_STATUS.ERROR;
+        }
+
+        // Skip status check if currently printing to avoid EBUSY conflicts
+        if (this.isPrinting) {
+            // Return cached status during printing
+            return this.lastStatus || PRINTER_STATUS.READY;
         }
 
         if (!ioctl) {
@@ -192,17 +199,27 @@ class Printer extends EventEmitter {
             console.log(`Printing ${copies} copies of ${template}`);
             console.log(`EPL data length: ${eplData.length} bytes`);
 
-            // Send to printer
-            await this.sendToPrinter(eplData, copies);
+            // Set printing flag to prevent status conflicts
+            this.isPrinting = true;
 
-            return {
-                success: true,
-                template,
-                copies,
-                dataLength: eplData.length
-            };
+            try {
+                // Send to printer
+                await this.sendToPrinter(eplData, copies);
+
+                return {
+                    success: true,
+                    template,
+                    copies,
+                    dataLength: eplData.length
+                };
+            } finally {
+                // Always clear printing flag
+                this.isPrinting = false;
+            }
 
         } catch (error) {
+            // Ensure flag is cleared on any error
+            this.isPrinting = false;
             console.error('Print job failed:', error);
             throw error;
         }
