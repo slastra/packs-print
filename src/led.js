@@ -128,7 +128,7 @@ class LedController extends EventEmitter {
             // Pulsing white fade effect
             const steps = 20;
             const maxBrightness = 255;
-            const duration = 2000; // 2 seconds total
+            const duration = 2000; // Fixed 2 second duration
             const stepDelay = duration / (steps * 2); // Time per step for fade in/out
 
             // Fade in

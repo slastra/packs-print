@@ -1,4 +1,6 @@
-import { createRequire } from 'module';
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { EventEmitter } from 'events';
 import os from 'os';
 import process from 'process';
@@ -9,13 +11,12 @@ import { createPrintQueue } from './queue.js';
 import { createLedController } from './led.js';
 import { createMonitor } from './monitor.js';
 
-const require = createRequire(import.meta.url);
 const config = {
     mqtt: {
-        host: process.env.MQTT_HOST || 'servicez.cloud',
+        host: process.env.MQTT_HOST,
         port: parseInt(process.env.MQTT_PORT || '1883'),
-        username: process.env.MQTT_USERNAME || 'rez',
-        password: process.env.MQTT_PASSWORD || 'ukn8qnc2QYP@acz4pjd'
+        username: process.env.MQTT_USERNAME,
+        password: process.env.MQTT_PASSWORD
     },
     printer: {
         media: process.env.PRINTER_MEDIA || '2x1',
@@ -72,7 +73,7 @@ class PrinterApp extends EventEmitter {
             await this.components.mqtt.connect();
 
             console.log('Ready');
-            
+
         } catch (error) {
             console.error('Failed to initialize:', error);
             await this.components.led?.setColor(255, 0, 0, 100); // Red for error
@@ -128,7 +129,7 @@ class PrinterApp extends EventEmitter {
                 processing: queueStatus.processing,
                 media: this.config.printer.media
             };
-            
+
             // Only publish if MQTT is connected
             if (this.components.mqtt.connected) {
                 this.components.mqtt.publishStatus(enhancedStatus);
@@ -160,7 +161,7 @@ class PrinterApp extends EventEmitter {
         // Printer events
         this.components.printer.on('statusChanged', (status) => {
             console.log(`Printer status: ${status}`);
-            
+
             // Try to reconnect if device becomes available
             if (status === 'device not available' || status === 'device disconnected') {
                 setTimeout(() => {
@@ -172,7 +173,7 @@ class PrinterApp extends EventEmitter {
         this.components.printer.on('error', (error) => {
             console.error('Printer error:', error);
             // Don't emit global error for device unavailable
-            if (!error.message.includes('device not available') && 
+            if (!error.message.includes('device not available') &&
                 !error.message.includes('Cannot access printer device')) {
                 this.emit('error', error);
             }
