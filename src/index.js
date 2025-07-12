@@ -10,6 +10,7 @@ import { createMqttClient } from './mqtt.js';
 import { createPrintQueue } from './queue.js';
 import { createLedController } from './led.js';
 import { createMonitor } from './monitor.js';
+import { logger, MODULES } from './logger.js';
 
 const config = {
     mqtt: {
@@ -44,7 +45,7 @@ class PrinterApp extends EventEmitter {
     }
 
     async initialize() {
-        console.log(`Starting Packs Print on ${this.hostname}`);
+        logger.info(MODULES.APP, `Starting Packs Print on ${this.hostname}`);
 
         try {
             // Initialize components
@@ -64,7 +65,7 @@ class PrinterApp extends EventEmitter {
             // Initialize printer (don't fail if device not available)
             const printerInitialized = await this.components.printer.initialize();
             if (!printerInitialized) {
-                // Application continues without printer
+                logger.warn(MODULES.APP, 'Continuing without printer device');
             }
 
             // Start monitoring
@@ -73,10 +74,10 @@ class PrinterApp extends EventEmitter {
             // Connect MQTT
             await this.components.mqtt.connect();
 
-            console.log('Ready');
+            logger.success(MODULES.APP, 'Application ready');
 
         } catch (error) {
-            console.error('Failed to initialize:', error);
+            logger.error(MODULES.APP, `Initialization failed: ${error.message}`);
             await this.components.led?.setColor(255, 0, 0, 100); // Red for error
             throw error;
         }
@@ -88,14 +89,13 @@ class PrinterApp extends EventEmitter {
             try {
                 await this.components.queue.add(job);
             } catch (error) {
-                console.error('Failed to queue print job:', error);
+                logger.error(MODULES.APP, `Failed to queue job: ${error.message}`);
                 this.emit('error', error);
             }
         });
 
         // Print queue events
         this.components.queue.on('jobStarted', (job) => {
-            console.log(`Starting print job: ${job.template} (${job.copies} copies)`);
             this.components.led.setColor(0, 0, 255, 100); // Blue for processing
         });
 
@@ -109,13 +109,11 @@ class PrinterApp extends EventEmitter {
         });
 
         this.components.queue.on('jobCompleted', (job) => {
-            console.log(`Print job completed: ${job.template}`);
             this.components.led.setColor(0, 255, 0, 100); // Green for success
             this.components.mqtt.publishSuccess(job);
         });
 
         this.components.queue.on('jobFailed', (job, error) => {
-            console.error(`Print job failed: ${job.template}`, error);
             this.components.led.setColor(255, 0, 0, 100); // Red for error
             this.components.mqtt.publishFailure(job, error);
         });
@@ -140,28 +138,25 @@ class PrinterApp extends EventEmitter {
 
         // MQTT connection events
         this.components.mqtt.on('connecting', () => {
-            // Connecting to MQTT
             this.components.led.pulse(255, 255, 0, 1000); // Pulsing yellow while connecting
         });
 
         this.components.mqtt.on('connected', () => {
-            console.log('MQTT connected');
             // LED will be updated by next status update
         });
 
         this.components.mqtt.on('disconnected', () => {
-            console.log('MQTT disconnected');
             // Don't override LED here - let status update handle it
         });
 
         this.components.mqtt.on('error', (error) => {
-            console.error('MQTT error:', error);
+            logger.error(MODULES.APP, `MQTT error: ${error.message}`);
             this.components.led.setColor(255, 0, 0, 300); // Red for error
         });
 
         // Printer events
         this.components.printer.on('statusChanged', (status) => {
-            console.log(`Printer status: ${status}`);
+            logger.debug(MODULES.APP, `Printer status: ${status}`);
 
             // Try to reconnect if device becomes available
             if (status === 'device not available' || status === 'device disconnected') {
@@ -172,17 +167,17 @@ class PrinterApp extends EventEmitter {
         });
 
         this.components.printer.on('error', (error) => {
-            console.error('Printer error:', error);
             // Don't emit global error for device unavailable
             if (!error.message.includes('device not available') &&
                 !error.message.includes('Cannot access printer device')) {
+                logger.error(MODULES.APP, `Printer error: ${error.message}`);
                 this.emit('error', error);
             }
         });
 
         // Global error handling
         this.on('error', (error) => {
-            console.error('Application error:', error);
+            logger.error(MODULES.APP, error.message);
             this.components.led.setColor(255, 0, 0, 100); // Red for error
         });
     }
@@ -220,7 +215,7 @@ class PrinterApp extends EventEmitter {
         if (this.isShuttingDown) return;
         this.isShuttingDown = true;
 
-        console.log('Shutting down gracefully...');
+        logger.info(MODULES.APP, 'Shutting down gracefully');
 
         try {
             // Stop monitoring
@@ -235,9 +230,9 @@ class PrinterApp extends EventEmitter {
             // Turn off LED
             await this.components.led?.setColor(0, 0, 0, 100);
 
-            console.log('✓ Graceful shutdown completed');
+            logger.success(MODULES.APP, 'Shutdown completed');
         } catch (error) {
-            console.error('Error during shutdown:', error);
+            logger.error(MODULES.APP, `Shutdown error: ${error.message}`);
         }
 
         process.exit(0);
@@ -253,12 +248,12 @@ process.on('SIGINT', () => app.shutdown());
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
-    console.error('Uncaught exception:', error);
+    logger.error(MODULES.APP, `Uncaught exception: ${error.message}`);
     app.shutdown();
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled rejection at:', promise, 'reason:', reason);
+    logger.error(MODULES.APP, `Unhandled rejection: ${reason}`);
     app.shutdown();
 });
 
@@ -266,6 +261,6 @@ process.on('unhandledRejection', (reason, promise) => {
 try {
     await app.initialize();
 } catch (error) {
-    console.error('Failed to start application:', error);
+    logger.error(MODULES.APP, `Failed to start: ${error.message}`);
     process.exit(1);
 }

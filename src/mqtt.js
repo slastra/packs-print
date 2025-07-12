@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import mqtt from 'mqtt';
+import { logger, MODULES } from './logger.js';
 
 class MqttClient extends EventEmitter {
     constructor(config, hostname) {
@@ -14,12 +15,11 @@ class MqttClient extends EventEmitter {
 
     async connect() {
         if (this.client && !this.client.disconnected) {
-            console.log('MQTT client already connected or connecting');
             return;
         }
 
         try {
-            console.log(`Connecting to MQTT broker at ${this.config.host}:${this.config.port}`);
+            logger.info(MODULES.MQTT, `Connecting to ${this.config.host}:${this.config.port}`);
             this.client = mqtt.connect({
                 host: this.config.host,
                 port: this.config.port,
@@ -57,7 +57,7 @@ class MqttClient extends EventEmitter {
             });
 
         } catch (error) {
-            console.error('MQTT connection failed:', error);
+            logger.error(MODULES.MQTT, `Connection failed: ${error.message}`);
             this.emit('error', error);
             throw error;
         }
@@ -74,10 +74,10 @@ class MqttClient extends EventEmitter {
 
             this.client.subscribe(subscribeTopics, (err) => {
                 if (err) {
-                    console.error('MQTT subscription error:', err);
+                    logger.error(MODULES.MQTT, `Subscription failed: ${err.message}`);
                     this.emit('error', err);
                 } else {
-                    // Subscribed successfully
+                    logger.success(MODULES.MQTT, 'Connected and subscribed');
                     this.emit('connected');
                 }
             });
@@ -87,36 +87,34 @@ class MqttClient extends EventEmitter {
             try {
                 this.handleMessage(topic, message);
             } catch (error) {
-                console.error('Error handling MQTT message:', error);
+                logger.error(MODULES.MQTT, `Message handling failed: ${error.message}`);
                 this.emit('error', error);
             }
         });
 
         this.client.on('error', (error) => {
-            console.error('MQTT error:', error);
+            logger.error(MODULES.MQTT, error.message);
             this.connected = false;
             this.emit('error', error);
         });
 
         this.client.on('offline', () => {
-            // MQTT client offline
             this.connected = false;
             this.emit('disconnected');
         });
 
         this.client.on('reconnect', () => {
             this.reconnectAttempts++;
-            // Reconnecting
 
             if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-                console.error('Max MQTT reconnect attempts reached');
+                logger.error(MODULES.MQTT, 'Max reconnect attempts reached');
                 this.client.end();
                 this.emit('error', new Error('Max reconnect attempts reached'));
             }
         });
 
         this.client.on('close', () => {
-            console.log('MQTT connection closed');
+            logger.info(MODULES.MQTT, 'Connection closed');
             this.connected = false;
             this.emit('disconnected');
         });
@@ -126,14 +124,12 @@ class MqttClient extends EventEmitter {
         try {
             const messageData = JSON.parse(message.toString());
 
-            console.log('Received label message:', JSON.stringify(messageData, null, 2));
-
             // Extract template and copies from message data
             const { template } = messageData;
             const copies = parseInt(messageData.copies) || 1;
 
             if (!template) {
-                console.warn('Missing template in message:', messageData);
+                logger.warn(MODULES.MQTT, 'Missing template in message');
                 return;
             }
 
@@ -148,12 +144,13 @@ class MqttClient extends EventEmitter {
                 topic
             };
 
-            console.log(`Print job: ${template} x${copies}`);
+            logger.info(MODULES.MQTT, `Print job received: ${template} x${copies}`);
+            logger.debug(MODULES.MQTT, `Message data: ${JSON.stringify(messageData, null, 2)}`);
 
             this.emit('printJob', job);
 
         } catch (error) {
-            console.error('Error parsing MQTT message:', error);
+            logger.error(MODULES.MQTT, `Message parsing failed: ${error.message}`);
 
             // Publish error for monitoring
             this.publishError({
@@ -183,8 +180,10 @@ class MqttClient extends EventEmitter {
                 retain: true
             });
 
+            logger.debug(MODULES.MQTT, `Status published: ${JSON.stringify(statusData, null, 2)}`);
+
         } catch (error) {
-            console.error('Error publishing status:', error);
+            logger.error(MODULES.MQTT, `Status publishing failed: ${error.message}`);
         }
     }
 
@@ -202,9 +201,11 @@ class MqttClient extends EventEmitter {
             await this.publish(`packs/labels/${this.hostname}/success`, successData, {
                 qos: 1
             });
-            console.log('Publishing success:', JSON.stringify(successData, null, 2));
+
+            logger.success(MODULES.MQTT, `Print success published: ${job.template} x${job.copies}`);
+            logger.debug(MODULES.MQTT, `Success data: ${JSON.stringify(successData, null, 2)}`);
         } catch (error) {
-            console.error('Error publishing success:', error);
+            logger.error(MODULES.MQTT, `Success publishing failed: ${error.message}`);
         }
     }
 
@@ -230,14 +231,15 @@ class MqttClient extends EventEmitter {
                 timestamp: new Date().toISOString()
             };
 
-            console.log('Publishing failure:', JSON.stringify(failureData, null, 2));
-
             await this.publish(`packs/labels/${this.hostname}/failure`, failureData, {
                 qos: 1
             });
 
+            logger.error(MODULES.MQTT, `Print failure published: ${job.template} - ${failureData.errorType}`);
+            logger.debug(MODULES.MQTT, `Failure data: ${JSON.stringify(failureData, null, 2)}`);
+
         } catch (error) {
-            console.error('Error publishing failure:', error);
+            logger.error(MODULES.MQTT, `Failure publishing failed: ${error.message}`);
         }
     }
 
@@ -250,7 +252,7 @@ class MqttClient extends EventEmitter {
             });
 
         } catch (error) {
-            console.error('Error publishing error:', error);
+            logger.error(MODULES.MQTT, `Error publishing failed: ${error.message}`);
         }
     }
 
@@ -283,12 +285,12 @@ class MqttClient extends EventEmitter {
             }, { qos: 1, retain: true });
 
         } catch (error) {
-            console.error('Error publishing offline status:', error);
+            logger.error(MODULES.MQTT, `Offline status publishing failed: ${error.message}`);
         }
 
         return new Promise((resolve) => {
             this.client.end(false, {}, () => {
-                console.log('✓ MQTT disconnected');
+                logger.info(MODULES.MQTT, 'Disconnected');
                 this.connected = false;
                 resolve();
             });

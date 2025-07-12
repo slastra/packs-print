@@ -4,6 +4,7 @@ import { promises as fs } from 'fs';
 import fsSync from 'fs';
 import path from 'path';
 import handlebars from 'handlebars';
+import { logger, MODULES } from './logger.js';
 
 const require = createRequire(import.meta.url);
 
@@ -12,7 +13,7 @@ let ioctl;
 try {
     ioctl = require('ioctl');
 } catch (error) {
-    console.log('ioctl module not available, using fallback implementation:', error.message);
+    logger.warn(MODULES.PRINTER, 'ioctl module not available, using fallback');
     ioctl = null;
 }
 
@@ -42,7 +43,7 @@ class Printer extends EventEmitter {
     }
 
     async initialize() {
-        console.log(`Initializing printer on ${this.device}`);
+        logger.info(MODULES.PRINTER, `Initializing on ${this.device}`);
 
         try {
             // Check device access
@@ -53,12 +54,12 @@ class Printer extends EventEmitter {
             const status = await this.getStatus();
             this.lastStatus = status;
 
-            console.log(`Printer initialized: ${this.statusToString(status)}`);
+            logger.success(MODULES.PRINTER, `Initialized: ${this.statusToString(status)}`);
             this.initializationFailed = false;
 
             return true;
         } catch (error) {
-            console.log(`Printer offline: ${error.message}`);
+            logger.warn(MODULES.PRINTER, `Offline: ${error.message}`);
 
             this.deviceAvailable = false;
             this.initializationFailed = true;
@@ -115,7 +116,7 @@ class Printer extends EventEmitter {
 
             return status;
         } catch (error) {
-            console.error('Error getting printer status:', error);
+            logger.debug(MODULES.PRINTER, `Status check failed: ${error.message}`);
 
             // Device might have been disconnected
             this.deviceAvailable = false;
@@ -196,8 +197,8 @@ class Printer extends EventEmitter {
                 throw new Error('Template rendered to empty data');
             }
 
-            console.log(`Printing ${copies} copies of ${template}`);
-            console.log(`EPL data length: ${eplData.length} bytes`);
+            logger.info(MODULES.PRINTER, `Printing ${template} x${copies}`);
+            logger.debug(MODULES.PRINTER, `EPL data length: ${eplData.length} bytes`);
 
             // Set printing flag to prevent status conflicts
             this.isPrinting = true;
@@ -205,6 +206,8 @@ class Printer extends EventEmitter {
             try {
                 // Send to printer
                 await this.sendToPrinter(eplData, copies);
+
+                logger.success(MODULES.PRINTER, `Print completed: ${template} x${copies}`);
 
                 return {
                     success: true,
@@ -220,7 +223,7 @@ class Printer extends EventEmitter {
         } catch (error) {
             // Ensure flag is cleared on any error
             this.isPrinting = false;
-            console.error('Print job failed:', error);
+            logger.error(MODULES.PRINTER, `Print failed: ${error.message}`);
             throw error;
         }
     }
@@ -229,18 +232,13 @@ class Printer extends EventEmitter {
         try {
             // For multiple copies, send the EPL data multiple times
             for (let copy = 1; copy <= copies; copy++) {
-                console.log(`Sending copy ${copy}/${copies}...`);
+                logger.debug(MODULES.PRINTER, `Sending copy ${copy}/${copies}`);
 
                 await fs.writeFile(this.device, eplData);
 
-                console.log(`✓ Copy ${copy}/${copies} sent successfully`);
-
-                // Wait for label to print before sending next copy or completing
-                console.log(`Waiting ${this.printDelay}ms for label to complete printing...`);
+                logger.debug(MODULES.PRINTER, `Copy ${copy}/${copies} sent, waiting ${this.printDelay}ms`);
                 await new Promise(resolve => setTimeout(resolve, this.printDelay));
             }
-
-            console.log(`✓ All ${copies} copies completed printing`);
 
         } catch (error) {
             throw new Error(`Failed to send to printer: ${error.message}`);
@@ -264,7 +262,7 @@ class Printer extends EventEmitter {
     }
 
     async retryConnection() {
-        console.log('Attempting to reconnect to printer device...');
+        logger.info(MODULES.PRINTER, 'Attempting to reconnect');
 
         try {
             await this.checkDeviceAccess();
@@ -277,13 +275,13 @@ class Printer extends EventEmitter {
                 const status = await this.getStatus();
                 this.lastStatus = status;
 
-                console.log(`✓ Printer reconnected - Status: ${this.statusToString(status)}`);
+                logger.success(MODULES.PRINTER, `Reconnected: ${this.statusToString(status)}`);
                 this.emit('statusChanged', 'reconnected');
 
                 return true;
             }
         } catch (error) {
-            console.debug('Printer device still not available:', error.message);
+            logger.debug(MODULES.PRINTER, `Reconnection failed: ${error.message}`);
             return false;
         }
 
@@ -292,7 +290,7 @@ class Printer extends EventEmitter {
 
     clearTemplateCache() {
         this.templateCache.clear();
-        console.log('Template cache cleared');
+        logger.info(MODULES.PRINTER, 'Template cache cleared');
     }
 }
 

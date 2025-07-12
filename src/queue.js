@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { logger, MODULES } from './logger.js';
 
 class PrintQueue extends EventEmitter {
     constructor() {
@@ -31,8 +32,8 @@ class PrintQueue extends EventEmitter {
         this.queue.push(enhancedJob);
         this.stats.totalJobs++;
 
-        console.log(`Job queued: ${enhancedJob.template} (ID: ${enhancedJob.id})`);
-        console.log(`Queue length: ${this.queue.length}`);
+        logger.info(MODULES.QUEUE, `Job queued: ${enhancedJob.template} x${enhancedJob.copies}`);
+        logger.debug(MODULES.QUEUE, `Job ID: ${enhancedJob.id}, Queue length: ${this.queue.length}`);
 
         this.emit('jobQueued', enhancedJob);
 
@@ -50,7 +51,7 @@ class PrintQueue extends EventEmitter {
         }
 
         this.processing = true;
-        console.log('Starting queue processing...');
+        logger.info(MODULES.QUEUE, 'Processing started');
 
         while (this.queue.length > 0) {
             const job = this.queue.shift();
@@ -58,7 +59,7 @@ class PrintQueue extends EventEmitter {
         }
 
         this.processing = false;
-        console.log('Queue processing completed');
+        logger.info(MODULES.QUEUE, 'Processing completed');
         this.emit('queueEmpty');
     }
 
@@ -67,7 +68,8 @@ class PrintQueue extends EventEmitter {
         job.status = 'processing';
         job.startedAt = new Date().toISOString();
 
-        console.log(`Processing job: ${job.template} (ID: ${job.id})`);
+        logger.info(MODULES.QUEUE, `Processing: ${job.template} x${job.copies}`);
+        logger.debug(MODULES.QUEUE, `Job ID: ${job.id}`);
         this.emit('jobStarted', job);
 
         try {
@@ -109,7 +111,8 @@ class PrintQueue extends EventEmitter {
         this.stats.completedJobs++;
         this.currentJob = null;
 
-        console.log(`✓ Job completed: ${job.template} (ID: ${job.id})`);
+        logger.success(MODULES.QUEUE, `Job completed: ${job.template} x${job.copies}`);
+        logger.debug(MODULES.QUEUE, `Job ID: ${job.id}`);
         this.emit('jobCompleted', job);
     }
 
@@ -124,7 +127,8 @@ class PrintQueue extends EventEmitter {
         this.stats.failedJobs++;
         this.currentJob = null;
 
-        console.error(`✗ Job failed: ${job.template} (ID: ${job.id}) - ${error.message}`);
+        logger.error(MODULES.QUEUE, `Job failed: ${job.template} - ${error.message}`);
+        logger.debug(MODULES.QUEUE, `Job ID: ${job.id}`);
         this.emit('jobFailed', job, error);
     }
 
@@ -183,14 +187,14 @@ class PrintQueue extends EventEmitter {
 
     async clearQueue() {
         if (this.processing) {
-            console.warn('Cannot clear queue while processing');
+            logger.warn(MODULES.QUEUE, 'Cannot clear queue while processing');
             return false;
         }
 
         const clearedCount = this.queue.length;
         this.queue = [];
 
-        console.log(`Queue cleared: ${clearedCount} jobs removed`);
+        logger.info(MODULES.QUEUE, `Queue cleared: ${clearedCount} jobs removed`);
         this.emit('queueCleared', clearedCount);
 
         return true;
@@ -201,7 +205,7 @@ class PrintQueue extends EventEmitter {
             return;
         }
 
-        console.log('Draining queue...');
+        logger.info(MODULES.QUEUE, 'Draining queue');
 
         return new Promise((resolve) => {
             if (this.queue.length === 0 && !this.processing) {
@@ -215,7 +219,7 @@ class PrintQueue extends EventEmitter {
 
     async pause() {
         if (this.processing) {
-            console.log('Queue processing paused');
+            logger.info(MODULES.QUEUE, 'Processing paused');
             this.processing = false;
             this.emit('queuePaused');
         }
@@ -223,7 +227,7 @@ class PrintQueue extends EventEmitter {
 
     async resume() {
         if (!this.processing && this.queue.length > 0) {
-            console.log('Queue processing resumed');
+            logger.info(MODULES.QUEUE, 'Processing resumed');
             this.processQueue();
             this.emit('queueResumed');
         }
