@@ -30,15 +30,17 @@ const PRINTER_STATUS = {
 };
 
 class Monitor extends EventEmitter {
-    constructor(config) {
+    constructor(config, printer = null) {
         super();
         this.config = config;
+        this.printer = printer;
         this.statusInterval = config.statusInterval || 10000;
         this.wifiInterface = config.wifiInterface || 'wlan0';
         this.monitorInterval = null;
         this.running = false;
         this.lastStatus = null;
         this.lastPrinterHardwareStatus = null;
+        this.skipNextInterval = false;
 
         // Printer device path
         this.printerDevice = process.env.PRINTER_DEVICE || '/dev/usb/lp0';
@@ -81,6 +83,12 @@ class Monitor extends EventEmitter {
     }
 
     async checkStatus() {
+        // Skip this interval check if requested
+        if (this.skipNextInterval) {
+            this.skipNextInterval = false;
+            return;
+        }
+
         try {
             const [wifiStatus, printerStatus] = await Promise.all([
                 this.getWifiStatus(),
@@ -102,6 +110,15 @@ class Monitor extends EventEmitter {
             console.error('Error checking system status:', error);
             this.emit('error', error);
         }
+    }
+
+    // Force immediate status update (e.g., when printing starts)
+    async forceStatusUpdate() {
+        // Perform immediate status check
+        await this.checkStatus();
+        
+        // Skip the next scheduled interval to avoid conflicts
+        this.skipNextInterval = true;
     }
 
 
@@ -231,6 +248,15 @@ class Monitor extends EventEmitter {
     }
 
     async getPrinterStatus() {
+        // Check if printer is currently printing
+        if (this.printer && this.printer.isPrinting) {
+            return {
+                status: 'printing',
+                statusCode: this.lastPrinterHardwareStatus || PRINTER_STATUS.READY,
+                statusHex: this.lastPrinterHardwareStatus ? `0x${this.lastPrinterHardwareStatus.toString(16)}` : '0x18'
+            };
+        }
+
         try {
             // First check if device is accessible
             await fs.access(this.printerDevice, fs.constants.W_OK);
@@ -405,6 +431,6 @@ class Monitor extends EventEmitter {
     }
 }
 
-export function createMonitor(config) {
-    return new Monitor(config);
+export function createMonitor(config, printer = null) {
+    return new Monitor(config, printer);
 }

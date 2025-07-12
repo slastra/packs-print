@@ -202,6 +202,9 @@ class Printer extends EventEmitter {
 
             // Set printing flag to prevent status conflicts
             this.isPrinting = true;
+            
+            // Emit event for immediate status update
+            this.emit('printingStarted');
 
             try {
                 // Send to printer

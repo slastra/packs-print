@@ -52,7 +52,7 @@ class PrinterApp extends EventEmitter {
             this.components.led = createLedController(this.config.led);
             this.components.printer = createPrinter(this.config.printer);
             this.components.queue = createPrintQueue();
-            this.components.monitor = createMonitor(this.config.monitoring);
+            this.components.monitor = createMonitor(this.config.monitoring, this.components.printer);
             this.components.mqtt = createMqttClient(this.config.mqtt, this.hostname);
 
             // Set up event listeners
@@ -163,6 +163,13 @@ class PrinterApp extends EventEmitter {
                 setTimeout(() => {
                     this.components.printer.retryConnection();
                 }, 5000);
+            }
+        });
+
+        // Force immediate status update when printing starts
+        this.components.printer.on('printingStarted', async () => {
+            if (this.components.monitor) {
+                await this.components.monitor.forceStatusUpdate();
             }
         });
 
