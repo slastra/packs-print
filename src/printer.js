@@ -33,6 +33,7 @@ class Printer extends EventEmitter {
         this.config = config;
         this.device = config.device;
         this.media = config.media;
+        this.printDelay = config.printDelay || 2000;
         this.lastStatus = null;
         this.templateCache = new Map();
         this.deviceAvailable = false;
@@ -217,13 +218,12 @@ class Printer extends EventEmitter {
 
                 console.log(`✓ Copy ${copy}/${copies} sent successfully`);
 
-                // Small delay between copies
-                if (copy < copies) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
+                // Wait for label to print before sending next copy or completing
+                console.log(`Waiting ${this.printDelay}ms for label to complete printing...`);
+                await new Promise(resolve => setTimeout(resolve, this.printDelay));
             }
 
-            console.log(`✓ All ${copies} copies sent successfully`);
+            console.log(`✓ All ${copies} copies completed printing`);
 
         } catch (error) {
             throw new Error(`Failed to send to printer: ${error.message}`);

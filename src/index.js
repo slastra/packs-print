@@ -20,7 +20,8 @@ const config = {
     },
     printer: {
         media: process.env.PRINTER_MEDIA || '2x1',
-        device: process.env.PRINTER_DEVICE || '/dev/usb/lp0'
+        device: process.env.PRINTER_DEVICE || '/dev/usb/lp0',
+        printDelay: parseInt(process.env.PRINT_DELAY_MS || '2000')
     },
     monitoring: {
         statusInterval: parseInt(process.env.STATUS_INTERVAL || '10000'),
