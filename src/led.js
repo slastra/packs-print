@@ -125,34 +125,31 @@ class LedController extends EventEmitter {
         }
 
         try {
-            // Rainbow sweep effect
-            const colors = [
-                [255, 0, 0],    // Red
-                [255, 127, 0],  // Orange
-                [255, 255, 0],  // Yellow
-                [0, 255, 0],    // Green
-                [0, 0, 255],    // Blue
-                [75, 0, 130],   // Indigo
-                [148, 0, 211]   // Violet
-            ];
+            // Pulsing white fade effect
+            const steps = 20;
+            const maxBrightness = 255;
+            const duration = 2000; // 2 seconds total
+            const stepDelay = duration / (steps * 2); // Time per step for fade in/out
 
-            // Quick sweep through rainbow
-            for (const [r, g, b] of colors) {
-                await this.setColor(r, g, b, 0);
-                await new Promise(resolve => setTimeout(resolve, 150));
+            // Fade in
+            for (let i = 0; i <= steps; i++) {
+                const brightness = Math.floor((i / steps) * maxBrightness);
+                await this.setColor(brightness, brightness, brightness, 0);
+                await new Promise(resolve => setTimeout(resolve, stepDelay));
             }
 
-            // Flash white twice
-            for (let i = 0; i < 2; i++) {
-                await this.setColor(255, 255, 255, 0);
-                await new Promise(resolve => setTimeout(resolve, 200));
-                await this.setColor(0, 0, 0, 0);
-                await new Promise(resolve => setTimeout(resolve, 200));
+            // Hold at full brightness briefly
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // Fade out
+            for (let i = steps; i >= 0; i--) {
+                const brightness = Math.floor((i / steps) * maxBrightness);
+                await this.setColor(brightness, brightness, brightness, 0);
+                await new Promise(resolve => setTimeout(resolve, stepDelay));
             }
 
-            // Final startup pulse - blue to indicate ready
-            await this.pulse(0, 100, 255, 800);
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Brief pause before normal operation
+            await new Promise(resolve => setTimeout(resolve, 200));
 
         } catch (error) {
             console.error('Error during LED startup effect:', error);
