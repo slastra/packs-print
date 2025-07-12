@@ -177,7 +177,6 @@ class MqttClient extends EventEmitter {
                 timestamp: new Date().toISOString()
             };
 
-            console.log('Publishing status:', JSON.stringify(statusData, null, 2));
 
             await this.publish(`packs/printers/${this.hostname}/status`, statusData, {
                 qos: 1,
@@ -203,7 +202,7 @@ class MqttClient extends EventEmitter {
             await this.publish(`packs/labels/${this.hostname}/success`, successData, {
                 qos: 1
             });
-
+            console.log('Publishing success:', JSON.stringify(successData, null, 2));
         } catch (error) {
             console.error('Error publishing success:', error);
         }
